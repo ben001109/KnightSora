@@ -2,13 +2,52 @@ const Discord = require('discord.js');
 const knightsora = new Discord.Client();
 require('dotenv').config();
 const prefix = process.env.prefix;
+const mysql = require('mysql');
 
+//Include Extensions
+
+//SQL Connection
+const connection = mysql.connection({
+  host: process.env.address,
+  user: process.env.account,
+  password: process.env.password,
+  database: process.env.database,
+});
+connection.connect((err) => {
+  if (err) throw err;
+  console.log('DB has been connected.');
+});
+
+//EXP Generate
+
+function generateExperiencePoint() {
+  const MinEXP = process.env.MinEXP;
+  const MaxEXP = process.env.MaxEXP;
+
+  return Math.floor(Math.random() * (MaxEXP - MinEXP + 1)) + MinEXP;
+}
+
+//Bot Settings
 knightsora.on('ready', () => {
   console.log(`Logged in as ${knightsora.user.tag}!`);
   knightsora.user.setPresence({ activity: { name: 'Powered by 結城あやの | Using /help', type: 'STREAMING' }, status: 'idle' });
 });
 
+//Command Entry
 knightsora.on('message', (msg) => {
+  connection.query(`SELECT * FROM xp WHERE ID = '${msg.author.id}' AND Guild = '${msg.channel.id}'`, (err, rows) => {
+    if (err) throw err;
+
+    let sql;
+
+    if (rows.length < 1) {
+      sql = `INSERT INTO xp (ID, GuildID, ExperiencePoint) VALUES '${msg.author.id}','${msg.guild.id}',${msg.guild.id},${generateExperiencePoint()}`;
+    } else {
+      let xp = rows[0].ExperiencePoint;
+      sql = `UPDATE xp SET ExperiencePoint = ${xp + generateExperiencePoint()} WHERE ID = '${msg.author.id}' AND GuildID = '${msg.guild.id}'`;
+    }
+    connection.query(sql);
+  });
   if (!msg.content.startsWith(prefix) || msg.author.bot) return;
   const args = msg.content.slice(prefix.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
@@ -45,4 +84,5 @@ knightsora.on('message', (msg) => {
   }
 });
 
+//Bot Login
 knightsora.login(process.env.token);
